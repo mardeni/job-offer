@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './index.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = '__REACT_APP_API_URL__';
 const parseBooleanEnv = (value, defaultValue = true) => {
   if (value === undefined || value === null || value === '') {
     return defaultValue;
@@ -12,7 +12,7 @@ const parseBooleanEnv = (value, defaultValue = true) => {
   return ['true', '1', 'yes', 'y', 'on'].includes(normalizedValue);
 };
 
-const REQUIRE_MOBILE = parseBooleanEnv(process.env.REACT_APP_REQUIRE_MOBILE, true);
+const REQUIRE_MOBILE = parseBooleanEnv('__REACT_APP_REQUIRE_MOBILE__', true);
 
 function App() {
   const [codigo, setCodigo] = useState('');
