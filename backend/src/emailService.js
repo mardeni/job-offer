@@ -54,8 +54,6 @@ const formatInscricaoEmail = (inscricao) => {
         <div class="section-title">👤 Dados Pessoais</div>
         <div class="field"><span class="field-label">Nome Completo:</span> <span class="field-value">${inscricao.nomeCompleto || 'N/A'}</span></div>
         <div class="field"><span class="field-label">CPF:</span> <span class="field-value">${inscricao.cpf || 'N/A'}</span></div>
-        <div class="field"><span class="field-label">RG:</span> <span class="field-value">${inscricao.rg || 'N/A'}</span></div>
-        <div class="field"><span class="field-label">Órgão Emissor:</span> <span class="field-value">${inscricao.orgaoEmissor || 'N/A'}</span></div>
         <div class="field"><span class="field-label">Data de Nascimento:</span> <span class="field-value">${inscricao.dataNascimento ? new Date(inscricao.dataNascimento).toLocaleDateString('pt-BR') : 'N/A'}</span></div>
         <div class="field"><span class="field-label">Estado Civil:</span> <span class="field-value">${inscricao.estadoCivil || 'N/A'}</span></div>
         <div class="field"><span class="field-label">Nome da Mãe:</span> <span class="field-value">${inscricao.nomeMae || 'N/A'}</span></div>
@@ -75,7 +73,6 @@ const formatInscricaoEmail = (inscricao) => {
         <div class="field"><span class="field-label">Bairro:</span> <span class="field-value">${inscricao.bairro || 'N/A'}</span></div>
         <div class="field"><span class="field-label">Cidade:</span> <span class="field-value">${inscricao.cidade || 'N/A'}</span></div>
         <div class="field"><span class="field-label">Estado:</span> <span class="field-value">${inscricao.estado || 'N/A'}</span></div>
-        <div class="field"><span class="field-label">CEP:</span> <span class="field-value">${inscricao.cep || 'N/A'}</span></div>
       </div>
 
       ${inscricao.deficiencia ? `

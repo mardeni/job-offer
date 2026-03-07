@@ -48,8 +48,28 @@ body {
 
 .header h1 {
   font-size: 28px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-weight: 700;
+}
+
+.header .header-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: left;
+}
+
+.header .header-text {
+  text-align: left;
+}
+
+.header .title-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 .header .subtitle {
@@ -80,6 +100,19 @@ body {
   padding: 20px;
   margin-bottom: 30px;
   border-radius: 8px;
+  position: relative;
+  padding-right: 96px;
+}
+
+.job-details-logo {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
 }
 
 .job-details h2 {
@@ -232,6 +265,7 @@ body {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
 
 .error-message {
   background: #fee2e2;

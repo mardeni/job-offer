@@ -14,6 +14,22 @@ const parseBooleanEnv = (value, defaultValue = true) => {
 
 const REQUIRE_MOBILE = parseBooleanEnv('__REACT_APP_REQUIRE_MOBILE__', true);
 
+const getSubmitErrorMessage = (err) => {
+  if (err?.response?.data?.message) {
+    return err.response.data.message;
+  }
+
+  if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
+    return 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
+  }
+
+  if (err?.response?.status >= 500) {
+    return 'Erro no servidor. Tente novamente em alguns instantes.';
+  }
+
+  return 'Erro ao enviar inscrição. Tente novamente.';
+};
+
 function App() {
   const [codigo, setCodigo] = useState('');
   const [isValidCode, setIsValidCode] = useState(false);
@@ -28,8 +44,6 @@ function App() {
   const [formData, setFormData] = useState({
     nomeCompleto: '',
     cpf: '',
-    rg: '',
-    orgaoEmissor: '',
     dataNascimento: '',
     email: '',
     telefone: '',
@@ -39,7 +53,6 @@ function App() {
     bairro: '',
     cidade: '',
     estado: 'AL',
-    cep: '',
     nomeMae: '',
     estadoCivil: '',
     deficiencia: '',
@@ -116,7 +129,11 @@ function App() {
         (error) => {
           let message = 'Erro ao obter localização.';
           if (error.code === error.PERMISSION_DENIED) {
-            message = 'Você precisa permitir o acesso à localização para se inscrever.';
+            message = 'Você negou o acesso à localização. Para permitir novamente, clique no cadeado na barra do navegador, habilite a localização e recarregue a página.';
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            message = 'Não foi possível obter sua localização. Verifique se o GPS está ativado.';
+          } else if (error.code === error.TIMEOUT) {
+            message = 'A solicitação de localização expirou. Tente novamente.';
           }
           reject(new Error(message));
         },
@@ -148,17 +165,23 @@ function App() {
     setSubmitting(true);
     setError('');
 
+    let location;
     try {
-      // Obter localização
-      const location = await getLocation();
-      
+      location = await getLocation();
+    } catch (locErr) {
+      setError(locErr?.message || 'Não foi possível obter sua localização. Verifique as permissões do navegador.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setSubmitting(false);
+      return;
+    }
+
+    try {
       const dataToSubmit = {
         ...formData,
         latitude: location.latitude,
         longitude: location.longitude
       };
 
-      // Enviar dados
       const response = await axios.post(`${API_URL}/api/submit`, {
         codigo: codigo,
         formData: dataToSubmit
@@ -170,7 +193,7 @@ function App() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Erro ao enviar inscrição. Tente novamente.');
+      setError(getSubmitErrorMessage(err));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSubmitting(false);
@@ -182,7 +205,6 @@ function App() {
       <div className="app">
         <div className="container">
           <div className="header">
-            <img className="header-logo" src="/logo.webp" alt="Logo da Câmara Municipal de Pilar" />
             <h1>📱 Acesso Restrito</h1>
           </div>
           <div className="content">
@@ -219,7 +241,6 @@ function App() {
       <div className="app">
         <div className="container">
           <div className="header">
-            <img className="header-logo" src="/logo.webp" alt="Logo da Câmara Municipal de Pilar" />
             <h1>❌ Acesso Negado</h1>
           </div>
           <div className="content">
@@ -240,7 +261,6 @@ function App() {
       <div className="app">
         <div className="container">
           <div className="header">
-            <img className="header-logo" src="/logo.webp" alt="Logo da Câmara Municipal de Pilar" />
             <h1>✅ Inscrição Realizada!</h1>
             <div className="subtitle">Câmara Municipal de Pilar - AL</div>
           </div>
@@ -273,22 +293,27 @@ function App() {
     <div className="app">
       <div className="container">
         <div className="header">
-          <img className="header-logo" src="/logo.webp" alt="Logo da Câmara Municipal de Pilar" />
-          <h1>📋 Inscrição para Vaga</h1>
-          <div className="subtitle">Câmara Municipal de Pilar - Alagoas</div>
-          <div className="site-link">
-            Site oficial: <a href="https://www.pilar.al.leg.br/" target="_blank" rel="noopener noreferrer">
-              www.pilar.al.leg.br
-            </a>
+          <div className="header-main">
+            <img className="title-logo" src="/logo.webp" alt="Logo da Câmara Municipal de Pilar" />
+            <div className="header-text">
+              <h1>📋 Inscrição para Vaga</h1>
+              <div className="subtitle">Câmara Municipal de Pilar - Alagoas</div>
+              <div className="site-link">
+                Site oficial: <a href="https://www.pilar.al.leg.br/" target="_blank" rel="noopener noreferrer">
+                  www.pilar.al.leg.br
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="content">
           <div className="job-details">
             <h2>Detalhes da Vaga</h2>
+            <img className="job-details-logo" src="/logo.webp" alt="Logo da Prefeitura de Pilar" />
             <div className="detail-item">
               <strong>Cargo:</strong>
-              <span>Assistente Legislativo</span>
+              <span>Assistente</span>
             </div>
             <div className="detail-item">
               <strong>Remuneração:</strong>
@@ -297,6 +322,10 @@ function App() {
             <div className="detail-item">
               <strong>Regime:</strong>
               <span>CLT + Benefícios</span>
+            </div>
+            <div className="detail-item">
+              <strong>Carga horária:</strong>
+              <span>6 horas</span>
             </div>
             <div className="detail-item">
               <strong>Local:</strong>
@@ -308,7 +337,7 @@ function App() {
                 <li>Executar atividades administrativas de apoio aos vereadores.</li>
                 <li>Atender ao público interno e externo, prestando informações e orientações.</li>
                 <li>Operar sistemas para inserção e atualização de dados.</li>
-                <li>Executar outras atividades correlatas determinadas pela chefia imediata</li>
+                <li>Executar outras atividades correlatas determinadas pela chefia imediata.</li>
               </ul>
             </div>
           </div>
@@ -391,36 +420,6 @@ function App() {
                   value={formData.dataNascimento}
                   onChange={handleInputChange}
                   required
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>
-                  RG <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="rg"
-                  value={formData.rg}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="00.000.000-0"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  Órgão Emissor <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="orgaoEmissor"
-                  value={formData.orgaoEmissor}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="SSP/AL"
                 />
               </div>
             </div>
@@ -535,35 +534,18 @@ function App() {
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>
-                  Bairro <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="bairro"
-                  value={formData.bairro}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="Nome do bairro"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  CEP <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="cep"
-                  value={formData.cep}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="00000-000"
-                  maxLength="9"
-                />
-              </div>
+            <div className="form-group">
+              <label>
+                Bairro <span className="required">*</span>
+              </label>
+              <input
+                type="text"
+                name="bairro"
+                value={formData.bairro}
+                onChange={handleInputChange}
+                required
+                placeholder="Nome do bairro"
+              />
             </div>
 
             <div className="form-row">

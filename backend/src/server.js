@@ -76,14 +76,12 @@ app.post('/api/submit', async (req, res) => {
     const requiredFields = [
       'nomeCompleto',
       'cpf',
-      'rg',
       'dataNascimento',
       'email',
       'telefone',
       'endereco',
       'cidade',
       'estado',
-      'cep',
       'latitude',
       'longitude'
     ];
