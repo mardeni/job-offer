@@ -27,38 +27,48 @@ fs.ensureDirSync(DATA_DIR);
 // Arquivo para rastrear códigos usados
 const USED_CODES_FILE = path.join(DATA_DIR, 'used_codes.json');
 
-// Carregar códigos já usados
-let usedCodes = [];
+// Carregar códigos já usados (contador por código)
+let usedCodes = {};
 if (fs.existsSync(USED_CODES_FILE)) {
-  usedCodes = fs.readJsonSync(USED_CODES_FILE);
+  const storedCodes = fs.readJsonSync(USED_CODES_FILE);
+  if (Array.isArray(storedCodes)) {
+    usedCodes = storedCodes.reduce((acc, code) => {
+      const normalized = String(code).toUpperCase();
+      acc[normalized] = (acc[normalized] || 0) + 1;
+      return acc;
+    }, {});
+  } else if (storedCodes && typeof storedCodes === 'object') {
+    usedCodes = storedCodes;
+  }
 }
+
+const getCodeCount = (code) => usedCodes[code] || 0;
+const isLimitReached = (code) => getCodeCount(code) >= 3;
 
 // Endpoint de health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Sistema de Inscrição - Câmara Municipal de Pilar/AL' });
 });
 
-// Endpoint para validar código do recrutador
-app.get('/api/validate-codigo-recrutador/:codigo', (req, res) => {
+// Endpoint para validar código da vaga
+app.get('/api/validate-codigo-vaga/:codigo', (req, res) => {
   const { codigo } = req.params;
   
   if (!codigo) {
-    return res.status(400).json({ valid: false, message: 'Código do recrutador não fornecido' });
+    return res.status(400).json({ valid: false, message: 'Código da vaga não fornecido' });
   }
 
   const codigoUpper = codigo.toUpperCase();
   const isValidCode = VALID_CODES.includes(codigoUpper);
-  const isUsed = usedCodes.includes(codigoUpper);
-  
   if (!isValidCode) {
-    return res.status(403).json({ valid: false, message: 'Código do recrutador inválido' });
+    return res.status(403).json({ valid: false, message: 'Código da vaga inválido' });
   }
   
-  if (isUsed) {
-    return res.status(403).json({ valid: false, message: 'Este código do recrutador já foi utilizado' });
+  if (isLimitReached(codigoUpper)) {
+    return res.status(403).json({ valid: false, message: 'Inscrições suspensas.' });
   }
   
-  res.json({ valid: true, message: 'Código do recrutador válido' });
+  res.json({ valid: true, message: 'Código da vaga válido' });
 });
 
 // Endpoint para submeter inscrição
@@ -66,16 +76,16 @@ app.post('/api/submit', async (req, res) => {
   try {
     const { codigo, formData } = req.body;
 
-    // Validar código do recrutador
+    // Validar código da vaga
     if (!codigo || !VALID_CODES.includes(codigo.toUpperCase())) {
-      return res.status(403).json({ success: false, message: 'Código do recrutador inválido' });
+      return res.status(403).json({ success: false, message: 'Código da vaga inválido' });
     }
 
     const codigoUpper = codigo.toUpperCase();
     
-    // Verificar se código já foi usado
-    if (usedCodes.includes(codigoUpper)) {
-      return res.status(403).json({ success: false, message: 'Este código do recrutador já foi utilizado' });
+    // Verificar limite de inscrições por código
+    if (isLimitReached(codigoUpper)) {
+      return res.status(403).json({ success: false, message: 'Inscrições suspensas.' });
     }
 
     // Validar dados obrigatórios
@@ -114,8 +124,8 @@ app.post('/api/submit', async (req, res) => {
     const filepath = path.join(DATA_DIR, filename);
     await fs.writeJson(filepath, inscricao, { spaces: 2 });
 
-    // Marcar código como usado
-    usedCodes.push(codigoUpper);
+    // Incrementar contador de inscrições do código
+    usedCodes[codigoUpper] = getCodeCount(codigoUpper) + 1;
     await fs.writeJson(USED_CODES_FILE, usedCodes, { spaces: 2 });
 
     // Enviar e-mail com os dados da inscrição

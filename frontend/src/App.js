@@ -81,16 +81,16 @@ function App() {
     checkMobile();
   }, []);
 
-  // Extrair código do recrutador da URL
+  // Extrair código da vaga da URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const codigoParam = urlParams.get('codigo-recrutador');
+    const codigoParam = urlParams.get('codigo-vaga');
 
     if (codigoParam && isMobile) {
       setCodigo(codigoParam);
       validateCode(codigoParam);
     } else if (isMobile) {
-      setError('Código do recrutador não fornecido. Verifique o link recebido.');
+      setError('Código da vaga não fornecido. Verifique o link recebido.');
       setLoading(false);
     }
   }, [isMobile]);
@@ -98,7 +98,7 @@ function App() {
   const validateCode = async (codigoToValidate) => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/validate-codigo-recrutador/${codigoToValidate}`);
+      const response = await axios.get(`${API_URL}/api/validate-codigo-vaga/${codigoToValidate}`);
       
       if (response.data.valid) {
         setIsValidCode(true);
@@ -106,7 +106,7 @@ function App() {
       }
       setLoading(false);
     } catch (err) {
-      setError(err.response?.data?.message || 'Código do recrutador inválido ou já utilizado.');
+      setError(err.response?.data?.message || 'Código da vaga inválido ou inscrições suspensas.');
       setIsValidCode(false);
       setLoading(false);
     }
@@ -237,7 +237,7 @@ function App() {
           <div className="content">
             <div className="loading">
               <div className="loading-spinner"></div>
-              <p>Validando código do recrutador...</p>
+              <p>Validando código da vaga...</p>
             </div>
           </div>
         </div>
@@ -254,10 +254,10 @@ function App() {
           </div>
           <div className="content">
             <div className="error-message">
-              {error || 'Código do recrutador inválido ou já utilizado.'}
+              {error || 'Código da vaga inválido ou inscrições suspensas.'}
             </div>
             <p style={{ textAlign: 'center', color: '#6b7280', marginTop: '20px' }}>
-              Entre em contato com o recrutador para obter um novo código de acesso.
+              Entre em contato com o responsável pela vaga para obter um novo código de acesso.
             </p>
           </div>
         </div>
@@ -317,6 +317,11 @@ function App() {
         </div>
 
         <div className="content">
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
           <div className="job-details">
             <h2>Detalhes da Vaga</h2>
             <img className="job-details-logo" src="/logo.webp" alt="Logo da Prefeitura de Pilar" />
@@ -379,12 +384,6 @@ function App() {
               </label>
             </div>
           </div>
-
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit}>
             <h2 style={{ marginBottom: '20px', color: '#1e40af' }}>Dados Pessoais</h2>

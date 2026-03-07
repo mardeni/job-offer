@@ -144,7 +144,7 @@ const formatInscricaoEmail = (inscricao) => {
     <div class="content">
       <div class="highlight">
         <strong>📋 Protocolo:</strong> ${inscricao.dataInscricao ? new Date(inscricao.dataInscricao).getTime() : 'N/A'}<br>
-        <strong>🔑 Código do Recrutador:</strong> ${inscricao.codigoRecrutador || 'N/A'}<br>
+        <strong>🔑 Código da Vaga:</strong> ${inscricao.codigoRecrutador || 'N/A'}<br>
         <strong>📅 Data/Hora:</strong> ${inscricao.dataInscricao ? new Date(inscricao.dataInscricao).toLocaleString('pt-BR', { timeZone: 'America/Maceio' }) : 'N/A'}
       </div>
 
@@ -228,7 +228,7 @@ const sendInscricaoEmail = async (inscricao) => {
     console.log('📨 Remetente:', `${fromName} <${maskEmail(fromEmail)}>`);
     console.log('📩 Destinatários:', maskedRecipients);
     console.log('🧩 Assunto:', subject);
-    console.log('🆔 Código:', inscricao.codigoRecrutador || 'N/A');
+    console.log('🆔 Código da vaga:', inscricao.codigoRecrutador || 'N/A');
 
     const raw = buildRawEmail({
       fromName,
