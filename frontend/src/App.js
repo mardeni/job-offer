@@ -132,7 +132,7 @@ function App() {
   const [autoRetryActive, setAutoRetryActive] = useState(false);
   const [autoRetryCount, setAutoRetryCount] = useState(0);
   const [pendingSubmission, setPendingSubmission] = useState(null);
-  const draftSentRef = useRef(false);
+  const lastDraftSignatureRef = useRef('');
   const [cpfError, setCpfError] = useState('');
 
   const [formData, setFormData] = useState({
@@ -240,16 +240,17 @@ function App() {
     });
   };
 
-  const sendDraftIfNeeded = useCallback((codigoValue, data) => {
-    if (draftSentRef.current) {
-      return;
-    }
-
+  const sendDraftIfNeeded = useCallback((codigoValue, data, options = {}) => {
     if (!isValidCode || !codigoValue || !hasRequiredFields(data)) {
       return;
     }
 
-    draftSentRef.current = true;
+    const signature = JSON.stringify({ codigo: codigoValue, formData: data });
+    if (!options.force && lastDraftSignatureRef.current === signature) {
+      return;
+    }
+
+    lastDraftSignatureRef.current = signature;
     void axios.post(`${API_URL}/api/submit-draft`, {
       codigo: codigoValue,
       formData: data
@@ -345,15 +346,29 @@ function App() {
     }
   };
 
-  const handleCpfBlur = () => {
-    const digits = normalizeCpf(formData.cpf);
-    if (!digits) {
-      setCpfError('');
+  const handleFieldBlur = useCallback((event) => {
+    const { name, value } = event.target || {};
+    if (!name || !(name in formData)) {
       return;
     }
 
-    setCpfError(isValidCpf(formData.cpf) ? '' : 'CPF inválido. Verifique os dígitos.');
-  };
+    const nextValue = name === 'cpf' ? formatCpf(value) : value;
+    const nextFormData = {
+      ...formData,
+      [name]: nextValue
+    };
+
+    if (name === 'cpf') {
+      const digits = normalizeCpf(nextValue);
+      if (!digits) {
+        setCpfError('');
+      } else {
+        setCpfError(isValidCpf(nextValue) ? '' : 'CPF inválido. Verifique os dígitos.');
+      }
+    }
+
+    sendDraftIfNeeded(codigo, nextFormData);
+  }, [codigo, formData, sendDraftIfNeeded]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -387,7 +402,7 @@ function App() {
     const currentFormData = { ...formData };
     const codigoValue = codigo;
     setPendingSubmission({ codigo: codigoValue, formData: currentFormData });
-    draftSentRef.current = false;
+    sendDraftIfNeeded(codigoValue, currentFormData, { force: true });
 
     let location;
     try {
@@ -598,7 +613,7 @@ function App() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} onBlur={handleFieldBlur}>
             <h2 style={{ marginBottom: '20px', color: '#1e40af' }}>Dados Pessoais</h2>
 
             <div className="form-group">
@@ -625,7 +640,6 @@ function App() {
                   name="cpf"
                   value={formData.cpf}
                   onChange={handleInputChange}
-                  onBlur={handleCpfBlur}
                   required
                   placeholder="000.000.000-00"
                   maxLength="14"
