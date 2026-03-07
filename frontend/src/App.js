@@ -59,6 +59,66 @@ const getSubmitErrorMessage = (err) => {
   return 'Erro ao enviar inscrição. Tente novamente.';
 };
 
+const normalizeCpf = (value) => String(value || '').replace(/\D/g, '');
+
+const formatCpf = (value) => {
+  const digits = normalizeCpf(value).slice(0, 11);
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 6) {
+    return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  }
+
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
+
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
+const isValidCpf = (value) => {
+  const digits = normalizeCpf(value);
+
+  if (digits.length !== 11) {
+    return false;
+  }
+
+  if (/^(\d)\1{10}$/.test(digits)) {
+    return false;
+  }
+
+  const numbers = digits.split('').map(Number);
+
+  let sum = 0;
+  for (let i = 0; i < 9; i += 1) {
+    sum += numbers[i] * (10 - i);
+  }
+
+  let check = (sum * 10) % 11;
+  if (check === 10) {
+    check = 0;
+  }
+
+  if (check !== numbers[9]) {
+    return false;
+  }
+
+  sum = 0;
+  for (let i = 0; i < 10; i += 1) {
+    sum += numbers[i] * (11 - i);
+  }
+
+  check = (sum * 10) % 11;
+  if (check === 10) {
+    check = 0;
+  }
+
+  return check === numbers[10];
+};
+
 function App() {
   const [codigo, setCodigo] = useState('');
   const [isValidCode, setIsValidCode] = useState(false);
@@ -73,6 +133,7 @@ function App() {
   const [autoRetryCount, setAutoRetryCount] = useState(0);
   const [pendingSubmission, setPendingSubmission] = useState(null);
   const draftSentRef = useRef(false);
+  const [cpfError, setCpfError] = useState('');
 
   const [formData, setFormData] = useState({
     nomeCompleto: '',
@@ -266,14 +327,51 @@ function App() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    const nextValue = name === 'cpf' ? formatCpf(value) : value;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
+
+    if (name === 'cpf') {
+      if (!normalizeCpf(nextValue)) {
+        setCpfError('');
+        return;
+      }
+
+      if (cpfError && isValidCpf(nextValue)) {
+        setCpfError('');
+      }
+    }
+  };
+
+  const handleCpfBlur = () => {
+    const digits = normalizeCpf(formData.cpf);
+    if (!digits) {
+      setCpfError('');
+      return;
+    }
+
+    setCpfError(isValidCpf(formData.cpf) ? '' : 'CPF inválido. Verifique os dígitos.');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const cpfDigits = normalizeCpf(formData.cpf);
+    if (!cpfDigits) {
+      setCpfError('CPF é obrigatório.');
+      setError('');
+      return;
+    }
+
+    if (!isValidCpf(formData.cpf)) {
+      setCpfError('CPF inválido. Verifique os dígitos.');
+      setError('');
+      return;
+    }
+
+    setCpfError('');
     
     if (!locationConsent) {
       setError(withLocationHelp('Você precisa autorizar o uso da localização para continuar.'));
@@ -556,10 +654,19 @@ function App() {
                   name="cpf"
                   value={formData.cpf}
                   onChange={handleInputChange}
+                  onBlur={handleCpfBlur}
                   required
                   placeholder="000.000.000-00"
                   maxLength="14"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(cpfError)}
+                  aria-describedby={cpfError ? 'cpf-error' : undefined}
                 />
+                {cpfError && (
+                  <small id="cpf-error" className="field-error">
+                    {cpfError}
+                  </small>
+                )}
               </div>
 
               <div className="form-group">
