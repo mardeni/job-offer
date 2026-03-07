@@ -287,16 +287,6 @@ body {
   text-align: center;
 }
 
-.warning-message {
-  background: #fef3c7;
-  border: 2px solid #f59e0b;
-  color: #92400e;
-  padding: 12px;
-  border-radius: 8px;
-  margin: 12px 0;
-  font-weight: 600;
-}
-
 .success-message h3 {
   color: #047857;
   font-size: 22px;

@@ -37,8 +37,6 @@ function App() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [protocolo, setProtocolo] = useState('');
-  const [emailSent, setEmailSent] = useState(true);
-  const [emailError, setEmailError] = useState('');
   const [locationConsent, setLocationConsent] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -166,8 +164,6 @@ function App() {
 
     setSubmitting(true);
     setError('');
-    setEmailSent(true);
-    setEmailError('');
 
     let location;
     try {
@@ -193,8 +189,14 @@ function App() {
 
       if (response.data.success) {
         const sent = response.data.emailSent !== false;
-        setEmailSent(sent);
-        setEmailError(sent ? '' : (response.data.emailError || 'Não foi possível enviar o e-mail.'));
+        if (!sent) {
+          const message = response.data.emailError
+            ? `Falha ao enviar e-mail: ${response.data.emailError}`
+            : 'Falha ao enviar e-mail. Tente novamente mais tarde.';
+          setError(message);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
         setSuccess(true);
         setProtocolo(response.data.protocolo);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -268,18 +270,13 @@ function App() {
       <div className="app">
         <div className="container">
           <div className="header">
-            <h1>{emailSent ? '✅ Inscrição Realizada!' : '✅ Inscrição Registrada!'}</h1>
+            <h1>✅ Inscrição Realizada!</h1>
             <div className="subtitle">Câmara Municipal de Pilar - AL</div>
           </div>
           <div className="content">
             <div className="success-message">
               <h3>🎉 Sua inscrição foi enviada com sucesso!</h3>
               <p>Sua candidatura para o cargo de Assistente Legislativo foi registrada.</p>
-              {!emailSent && (
-                <div className="warning-message">
-                  Falha ao enviar e-mail: {emailError || 'Tente novamente mais tarde.'}
-                </div>
-              )}
               <p>Guarde o número de protocolo abaixo para acompanhamento:</p>
               <div className="protocolo">
                 Protocolo: {protocolo}
