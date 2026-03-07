@@ -121,17 +121,26 @@ app.post('/api/submit', async (req, res) => {
     // Enviar e-mail com os dados da inscrição
     console.log('📧 Enviando e-mail com dados da inscrição...');
     const emailResult = await sendInscricaoEmail(inscricao);
-    
+
     if (emailResult.success) {
       console.log('✅ E-mail enviado com sucesso!');
     } else {
       console.log('⚠️ E-mail não foi enviado:', emailResult.message || emailResult.error);
     }
 
+    const emailSent = emailResult.success === true;
+    const emailError = emailSent
+      ? null
+      : (emailResult.message || emailResult.error || 'Falha ao enviar e-mail');
+
     res.json({
       success: true,
-      message: 'Inscrição realizada com sucesso!',
-      protocolo: timestamp
+      message: emailSent
+        ? 'Inscrição realizada com sucesso!'
+        : 'Inscrição registrada, mas o e-mail não foi enviado.',
+      protocolo: timestamp,
+      emailSent: emailSent,
+      emailError: emailError
     });
 
   } catch (error) {

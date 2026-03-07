@@ -1,12 +1,26 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 
+const parseBooleanEnv = (value, defaultValue = false) => {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+
+  const normalizedValue = String(value).trim().toLowerCase();
+  return ['true', '1', 'yes', 'y', 'on'].includes(normalizedValue);
+};
+
 // Configurar transporte de e-mail
 const createTransporter = () => {
+  const smtpSecure = parseBooleanEnv(process.env.SMTP_SECURE, false);
+  const smtpPort = process.env.SMTP_PORT
+    ? parseInt(process.env.SMTP_PORT, 10)
+    : (smtpSecure ? 465 : 587);
+
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
+    port: smtpPort,
+    secure: smtpSecure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
