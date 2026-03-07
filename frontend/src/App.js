@@ -22,6 +22,9 @@ const getLocationRetryDelay = (attempt) => {
   return Math.min(nextDelay, AUTO_LOCATION_RETRY_MAX_DELAY_MS);
 };
 
+const LOCATION_HELP_SUFFIX = ' Ative o GPS do seu celular e, se o erro persistir no navegador do Instagram, abra o link no Chrome ou Safari.';
+const withLocationHelp = (message) => `${message}${LOCATION_HELP_SUFFIX}`;
+
 const REQUIRED_FORM_FIELDS = [
   'nomeCompleto',
   'cpf',
@@ -145,7 +148,7 @@ function App() {
   const getLocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        reject(new Error('Geolocalização não é suportada pelo seu navegador.'));
+        reject(new Error(withLocationHelp('Geolocalização não é suportada pelo seu navegador.')));
         return;
       }
 
@@ -165,7 +168,7 @@ function App() {
           } else if (error.code === error.TIMEOUT) {
             message = 'A solicitação de localização expirou. Tente novamente.';
           }
-          reject(new Error(message));
+          reject(new Error(withLocationHelp(message)));
         },
         {
           enableHighAccuracy: true,
@@ -244,7 +247,7 @@ function App() {
       location = await getLocation();
     } catch (locErr) {
       setAutoRetryCount((prev) => prev + 1);
-      setError(locErr?.message || 'Não foi possível obter sua localização. Verifique as permissões do navegador.');
+      setError(locErr?.message || withLocationHelp('Não foi possível obter sua localização. Verifique as permissões do navegador.'));
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setSubmitting(false);
       return;
@@ -273,7 +276,7 @@ function App() {
     e.preventDefault();
     
     if (!locationConsent) {
-      setError('Você precisa autorizar o uso da localização para continuar.');
+      setError(withLocationHelp('Você precisa autorizar o uso da localização para continuar.'));
       return;
     }
 
@@ -296,7 +299,7 @@ function App() {
       setAutoRetryActive(true);
       setAutoRetryCount(0);
 
-      setError(locErr?.message || 'Não foi possível obter sua localização. Verifique as permissões do navegador.');
+      setError(locErr?.message || withLocationHelp('Não foi possível obter sua localização. Verifique as permissões do navegador.'));
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setSubmitting(false);
       return;
@@ -737,7 +740,7 @@ function App() {
 
             {!locationConsent && (
               <p style={{ textAlign: 'center', color: '#dc2626', marginTop: '15px', fontSize: '14px' }}>
-                ⚠️ Você precisa autorizar o uso da localização para enviar a inscrição
+                ⚠️ Você precisa autorizar o uso da localização para enviar a inscrição. Ative o GPS e, se o erro persistir no navegador do Instagram, abra o link no Chrome ou Safari.
               </p>
             )}
           </form>
