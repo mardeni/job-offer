@@ -598,35 +598,6 @@ function App() {
             </div>
           </div>
 
-          <div className="location-notice">
-            <h3>📍 Informação sobre Localização</h3>
-            <p>
-              <strong>Por que coletamos sua localização?</strong>
-            </p>
-            <p>
-              Solicitamos sua localização geográfica para verificar se você é residente 
-              da cidade de Pilar/AL e para calcular o itinerário e valor do vale-transporte 
-              que será fornecido caso você seja contratado(a).
-            </p>
-            <p style={{ fontSize: '13px', marginTop: '10px', opacity: 0.9 }}>
-              Sua localização será coletada no momento do envio do formulário e 
-              será utilizada exclusivamente para os fins descritos acima.
-            </p>
-
-            <div className="consent-check">
-              <input
-                type="checkbox"
-                id="locationConsent"
-                checked={locationConsent}
-                onChange={(e) => setLocationConsent(e.target.checked)}
-              />
-              <label htmlFor="locationConsent">
-                Autorizo o uso da minha localização para os fins descritos acima 
-                e estou ciente de que preciso ativar a geolocalização no meu dispositivo.
-              </label>
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit}>
             <h2 style={{ marginBottom: '20px', color: '#1e40af' }}>Dados Pessoais</h2>
 
@@ -837,6 +808,27 @@ function App() {
               </div>
             </div>
 
+            <div className="location-notice">
+              <h3>📍 Termos de Localização</h3>
+              <p>
+                Solicitamos sua localização geográfica para verificar se você é residente 
+                da cidade de Pilar/AL e para calcular o itinerário e valor do vale-transporte 
+                que será fornecido caso você seja contratado(a).
+              </p>
+
+              <div className="consent-check">
+                <input
+                  type="checkbox"
+                  id="locationConsent"
+                  checked={locationConsent}
+                  onChange={(e) => setLocationConsent(e.target.checked)}
+                />
+                <label htmlFor="locationConsent">
+                  Autorizo o uso da minha localização exclusivamente para os fins mencionados.
+                </label>
+              </div>
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary"
@@ -847,7 +839,7 @@ function App() {
 
             {!locationConsent && (
               <p style={{ textAlign: 'center', color: '#dc2626', marginTop: '15px', fontSize: '14px' }}>
-                ⚠️ Você precisa autorizar o uso da localização para enviar a inscrição. Ative o GPS e, se o erro persistir no navegador do Instagram, abra o link no Chrome ou Safari.
+                ⚠️ Ative o GPS e autorize o uso da localização para submeter à vaga.
               </p>
             )}
           </form>
