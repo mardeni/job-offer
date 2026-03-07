@@ -1,31 +1,115 @@
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 
-const parseBooleanEnv = (value, defaultValue = false) => {
-  if (value === undefined || value === null || value === '') {
-    return defaultValue;
+const maskEmail = (value) => {
+  if (!value || typeof value !== 'string') {
+    return 'N/A';
   }
 
-  const normalizedValue = String(value).trim().toLowerCase();
-  return ['true', '1', 'yes', 'y', 'on'].includes(normalizedValue);
+  const parts = value.split('@');
+  if (parts.length !== 2) {
+    return `${value[0] || ''}***`;
+  }
+
+  const [user, domain] = parts;
+  const safeUser = user.length <= 2
+    ? `${user[0] || ''}*`
+    : `${user[0]}***${user[user.length - 1]}`;
+
+  return `${safeUser}@${domain}`;
 };
 
-// Configurar transporte de e-mail
-const createTransporter = () => {
-  const smtpSecure = parseBooleanEnv(process.env.SMTP_SECURE, false);
-  const smtpPort = process.env.SMTP_PORT
-    ? parseInt(process.env.SMTP_PORT, 10)
-    : (smtpSecure ? 465 : 587);
+const encodeHeader = (value) => {
+  if (!value) {
+    return '';
+  }
 
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: smtpPort,
-    secure: smtpSecure,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
+  if (/^[\x00-\x7F]*$/.test(value)) {
+    return value;
+  }
+
+  const encoded = Buffer.from(value, 'utf-8').toString('base64');
+  return `=?UTF-8?B?${encoded}?=`;
+};
+
+const formatFromAddress = (name, email) => {
+  if (!name) {
+    return email;
+  }
+
+  return `${encodeHeader(name)} <${email}>`;
+};
+
+const chunkString = (value, size = 76) => {
+  const chunks = value.match(new RegExp(`.{1,${size}}`, 'g'));
+  return chunks ? chunks.join('\r\n') : value;
+};
+
+const base64UrlEncode = (value) => {
+  return Buffer.from(value, 'utf-8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+};
+
+const buildRawEmail = ({ fromName, fromEmail, toList, subject, html, attachments }) => {
+  const boundary = `mixed_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const headers = [
+    `From: ${formatFromAddress(fromName, fromEmail)}`,
+    `To: ${toList.join(', ')}`,
+    `Subject: ${encodeHeader(subject)}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/mixed; boundary="${boundary}"`
+  ];
+
+  const htmlBase64 = chunkString(Buffer.from(html, 'utf-8').toString('base64'));
+  const bodyLines = [
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    htmlBase64,
+    ''
+  ];
+
+  attachments.forEach((attachment) => {
+    const content = typeof attachment.content === 'string'
+      ? attachment.content
+      : attachment.content.toString('utf-8');
+    const contentBase64 = chunkString(Buffer.from(content, 'utf-8').toString('base64'));
+
+    bodyLines.push(
+      `--${boundary}`,
+      `Content-Type: ${attachment.contentType || 'application/octet-stream'}; name="${attachment.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      '',
+      contentBase64,
+      ''
+    );
   });
+
+  bodyLines.push(`--${boundary}--`, '');
+
+  const rawMessage = `${headers.join('\r\n')}\r\n\r\n${bodyLines.join('\r\n')}`;
+  return base64UrlEncode(rawMessage);
+};
+
+const getGmailClient = () => {
+  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
+  const redirectUri = process.env.GMAIL_REDIRECT_URI || 'https://developers.google.com/oauthplayground';
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Configurações do Gmail API não definidas');
+  }
+
+  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
+
+  return google.gmail({ version: 'v1', auth: oauth2Client });
 };
 
 // Formatar dados da inscrição para o e-mail
@@ -123,23 +207,34 @@ const formatInscricaoEmail = (inscricao) => {
 // Enviar e-mail com os dados da inscrição
 const sendInscricaoEmail = async (inscricao) => {
   try {
-    // Verificar se as configurações de e-mail estão definidas
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.log('⚠️ Configurações de e-mail não definidas. E-mail não enviado.');
-      return { success: false, message: 'Configurações de e-mail não definidas' };
+    const gmailUser = process.env.GMAIL_USER || process.env.EMAIL_FROM;
+    const fromEmail = process.env.EMAIL_FROM || gmailUser;
+    const fromName = process.env.EMAIL_FROM_NAME || 'Sistema de Inscrição';
+
+    if (!gmailUser || !fromEmail) {
+      console.log('⚠️ Configurações do Gmail API não definidas. E-mail não enviado.');
+      return { success: false, message: 'Configurações do Gmail API não definidas' };
     }
 
-    const transporter = createTransporter();
-    
-    // Obter lista de destinatários
+    const gmail = getGmailClient();
+
     const recipients = process.env.EMAIL_RECIPIENTS || 'mardeniferreira@gmail.com';
     const recipientsList = recipients.split(',').map(email => email.trim());
+    const maskedRecipients = recipientsList.map(maskEmail).join(', ');
+    const subject = `${process.env.EMAIL_SUBJECT || 'Nova Inscrição'} - ${inscricao.nomeCompleto}`;
 
-    // Configurar e-mail
-    const mailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'Sistema de Inscrição'}" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
-      to: recipientsList,
-      subject: `${process.env.EMAIL_SUBJECT || 'Nova Inscrição'} - ${inscricao.nomeCompleto}`,
+    console.log('📧 Tentando enviar e-mail via Gmail API');
+    console.log('👤 Usuário Gmail:', maskEmail(gmailUser));
+    console.log('📨 Remetente:', `${fromName} <${maskEmail(fromEmail)}>`);
+    console.log('📩 Destinatários:', maskedRecipients);
+    console.log('🧩 Assunto:', subject);
+    console.log('🆔 Código:', inscricao.codigoRecrutador || 'N/A');
+
+    const raw = buildRawEmail({
+      fromName,
+      fromEmail,
+      toList: recipientsList,
+      subject,
       html: formatInscricaoEmail(inscricao),
       attachments: [
         {
@@ -148,18 +243,33 @@ const sendInscricaoEmail = async (inscricao) => {
           contentType: 'application/json'
         }
       ]
-    };
+    });
 
-    // Enviar e-mail
-    const info = await transporter.sendMail(mailOptions);
-    
-    console.log('✅ E-mail enviado com sucesso!');
-    console.log('📧 Destinatários:', recipientsList.join(', '));
-    console.log('📋 Message ID:', info.messageId);
-    
-    return { success: true, messageId: info.messageId };
+    const startTime = Date.now();
+    const response = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: raw
+      }
+    });
+    const elapsedMs = Date.now() - startTime;
+
+    console.log('✅ E-mail enviado com sucesso via Gmail API!');
+    console.log('📧 Destinatários:', maskedRecipients);
+    console.log('📋 Message ID:', response.data.id || 'N/A');
+    console.log('🧵 Thread ID:', response.data.threadId || 'N/A');
+    console.log(`⏱️ Tempo de envio: ${elapsedMs}ms`);
+
+    return { success: true, messageId: response.data.id, threadId: response.data.threadId };
   } catch (error) {
-    console.error('❌ Erro ao enviar e-mail:', error.message);
+    console.error('❌ Erro ao enviar e-mail via Gmail API:', {
+      message: error.message,
+      code: error.code,
+      status: error?.response?.status,
+      data: error?.response?.data,
+      errno: error.errno,
+      stack: error.stack
+    });
     return { success: false, error: error.message };
   }
 };
