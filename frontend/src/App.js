@@ -827,6 +827,13 @@ function App() {
               </div>
             </div>
 
+            {(error || cpfError) && (
+              <div className="error-message" style={{ marginTop: '15px' }}>
+                {error && <div>{error}</div>}
+                {cpfError && <div>{cpfError}</div>}
+              </div>
+            )}
+
             <button
               type="submit"
               className="btn btn-primary"
