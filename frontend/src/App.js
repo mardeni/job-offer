@@ -22,7 +22,7 @@ const getLocationRetryDelay = (attempt) => {
   return Math.min(nextDelay, AUTO_LOCATION_RETRY_MAX_DELAY_MS);
 };
 
-const LOCATION_HELP_SUFFIX = ' Ative o GPS do seu celular e, se o erro persistir, certifique-se de abrir o link no navegador Chrome ou Safari.';
+const LOCATION_HELP_SUFFIX = ' Ative o GPS do seu celular e, se não estiver conseguindo submeter, certifique-se de abrir o link no navegador Chrome ou Safari.';
 const withLocationHelp = (message) => `${message}${LOCATION_HELP_SUFFIX}`;
 
 const REQUIRED_FORM_FIELDS = [
