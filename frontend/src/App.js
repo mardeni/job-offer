@@ -14,6 +14,24 @@ const parseBooleanEnv = (value, defaultValue = true) => {
 
 const REQUIRE_MOBILE = parseBooleanEnv('__REACT_APP_REQUIRE_MOBILE__', true);
 
+const REQUIRED_FORM_FIELDS = [
+  'nomeCompleto',
+  'cpf',
+  'dataNascimento',
+  'nomeMae',
+  'estadoCivil',
+  'email',
+  'telefone',
+  'endereco',
+  'numero',
+  'bairro',
+  'cidade',
+  'estado'
+];
+
+const isFieldFilled = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+const hasRequiredFields = (data) => REQUIRED_FORM_FIELDS.every((field) => isFieldFilled(data?.[field]));
+
 const getSubmitErrorMessage = (err) => {
   if (err?.response?.data?.message) {
     return err.response.data.message;
@@ -129,7 +147,7 @@ function App() {
         (error) => {
           let message = 'Erro ao obter localização.';
           if (error.code === error.PERMISSION_DENIED) {
-            message = 'Você negou o acesso à localização. Para permitir novamente, clique no cadeado na barra do navegador, habilite a localização e recarregue a página.';
+            message = 'Você negou o acesso à localização. Para permitir novamente, clique no ícone de permissões ao lado do endereço (pode ser um cadeado ou outro símbolo), habilite a localização e recarregue a página.';
           } else if (error.code === error.POSITION_UNAVAILABLE) {
             message = 'Não foi possível obter sua localização. Verifique se o GPS está ativado.';
           } else if (error.code === error.TIMEOUT) {
@@ -169,6 +187,15 @@ function App() {
     try {
       location = await getLocation();
     } catch (locErr) {
+      if (isValidCode && codigo && hasRequiredFields(formData)) {
+        void axios.post(`${API_URL}/api/submit-draft`, {
+          codigo: codigo,
+          formData: formData
+        }).catch((draftErr) => {
+          console.warn('Falha ao enviar pré-inscrição:', draftErr);
+        });
+      }
+
       setError(locErr?.message || 'Não foi possível obter sua localização. Verifique as permissões do navegador.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setSubmitting(false);

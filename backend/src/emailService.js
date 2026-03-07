@@ -114,6 +114,16 @@ const getGmailClient = () => {
 
 // Formatar dados da inscrição para o e-mail
 const formatInscricaoEmail = (inscricao) => {
+  const hasLocation = (
+    inscricao.latitude !== undefined &&
+    inscricao.latitude !== null &&
+    String(inscricao.latitude).trim() !== '' &&
+    inscricao.longitude !== undefined &&
+    inscricao.longitude !== null &&
+    String(inscricao.longitude).trim() !== ''
+  );
+  const isLocationPending = inscricao.localizacaoPendente === true;
+
   return `
 <!DOCTYPE html>
 <html>
@@ -129,6 +139,7 @@ const formatInscricaoEmail = (inscricao) => {
     .field-label { font-weight: 600; color: #4b5563; display: inline-block; min-width: 180px; }
     .field-value { color: #1f2937; }
     .highlight { background: #fef3c7; padding: 15px; border-left: 4px solid #f59e0b; margin: 20px 0; }
+    .notice { background: #fee2e2; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0; }
     .location { background: #dbeafe; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0; }
     .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
   </style>
@@ -147,6 +158,12 @@ const formatInscricaoEmail = (inscricao) => {
         <strong>🔑 Código da Vaga:</strong> ${inscricao.codigoRecrutador || 'N/A'}<br>
         <strong>📅 Data/Hora:</strong> ${inscricao.dataInscricao ? new Date(inscricao.dataInscricao).toLocaleString('pt-BR', { timeZone: 'America/Maceio' }) : 'N/A'}
       </div>
+
+      ${isLocationPending ? `
+      <div class="notice">
+        <strong>⚠️ Pré-inscrição:</strong> localização não informada. O envio final depende da permissão de geolocalização.
+      </div>
+      ` : ''}
 
       <div class="section">
         <div class="section-title">👤 Dados Pessoais</div>
@@ -184,12 +201,19 @@ const formatInscricaoEmail = (inscricao) => {
         <div class="section-title">📍 Geolocalização</div>
         <div class="field"><span class="field-label">Latitude:</span> <span class="field-value">${inscricao.latitude || 'N/A'}</span></div>
         <div class="field"><span class="field-label">Longitude:</span> <span class="field-value">${inscricao.longitude || 'N/A'}</span></div>
+        ${hasLocation ? `
         <div class="field">
-          <span class="field-label">Ver no Google Maps:</span> 
+          <span class="field-label">Ver no Google Maps:</span>
           <a href="https://www.google.com/maps?q=${inscricao.latitude},${inscricao.longitude}" target="_blank">
             Abrir localização
           </a>
         </div>
+        ` : `
+        <div class="field">
+          <span class="field-label">Ver no Google Maps:</span>
+          <span class="field-value">N/A</span>
+        </div>
+        `}
       </div>
 
       <div class="footer">
@@ -221,7 +245,8 @@ const sendInscricaoEmail = async (inscricao) => {
     const recipients = process.env.EMAIL_RECIPIENTS || 'mardeniferreira@gmail.com';
     const recipientsList = recipients.split(',').map(email => email.trim());
     const maskedRecipients = recipientsList.map(maskEmail).join(', ');
-    const subject = `${process.env.EMAIL_SUBJECT || 'Nova Inscrição'} - ${inscricao.nomeCompleto}`;
+    const baseSubject = process.env.EMAIL_SUBJECT || 'Nova Inscrição';
+    const subject = `${baseSubject}${inscricao.localizacaoPendente ? ' (localização pendente)' : ''} - ${inscricao.nomeCompleto}`;
 
     console.log('📧 Tentando enviar e-mail via Gmail API');
     console.log('👤 Usuário Gmail:', maskEmail(gmailUser));

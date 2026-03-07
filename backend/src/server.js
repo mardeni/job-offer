@@ -43,11 +43,12 @@ if (fs.existsSync(USED_CODES_FILE)) {
 }
 
 const getCodeCount = (code) => usedCodes[code] || 0;
-const isLimitReached = (code) => getCodeCount(code) >= 3;
+const MAX_USES_PER_CODE = 5;
+const isLimitReached = (code) => getCodeCount(code) >= MAX_USES_PER_CODE;
 
 // Endpoint de health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Sistema de Inscrição - Câmara Municipal de Pilar/AL' });
+  res.json({ status: 'ok', message: 'Sistema de Inscrição em Vagas de Emprego' });
 });
 
 // Endpoint para validar código da vaga
@@ -158,6 +159,69 @@ app.post('/api/submit', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erro ao processar inscrição. Tente novamente.'
+    });
+  }
+});
+
+// Endpoint para notificar inscrição sem localização
+app.post('/api/submit-draft', async (req, res) => {
+  try {
+    const { codigo, formData } = req.body;
+
+    if (!codigo || !VALID_CODES.includes(codigo.toUpperCase())) {
+      return res.status(403).json({ success: false, message: 'Código da vaga inválido' });
+    }
+
+    const codigoUpper = codigo.toUpperCase();
+
+    if (isLimitReached(codigoUpper)) {
+      return res.status(403).json({ success: false, message: 'Inscrições suspensas.' });
+    }
+
+    if (!formData || typeof formData !== 'object') {
+      return res.status(400).json({ success: false, message: 'Dados do formulário inválidos' });
+    }
+
+    const requiredFields = [
+      'nomeCompleto',
+      'cpf',
+      'dataNascimento',
+      'email',
+      'telefone',
+      'endereco',
+      'cidade',
+      'estado'
+    ];
+
+    const missingFields = requiredFields.filter(field => !formData[field]);
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Campos obrigatórios faltando: ${missingFields.join(', ')}`
+      });
+    }
+
+    const inscricao = {
+      codigoRecrutador: codigoUpper,
+      dataInscricao: new Date().toISOString(),
+      ...formData,
+      localizacaoPendente: true
+    };
+
+    console.log('📧 Enviando e-mail de pré-inscrição (localização pendente)...');
+    const emailResult = await sendInscricaoEmail(inscricao);
+
+    if (!emailResult.success) {
+      console.log('⚠️ E-mail de pré-inscrição não foi enviado:', emailResult.message || emailResult.error);
+      return res.status(502).json({ success: false, message: 'Falha ao enviar e-mail.' });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao enviar pré-inscrição:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao processar pré-inscrição. Tente novamente.'
     });
   }
 });
