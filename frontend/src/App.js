@@ -811,9 +811,7 @@ function App() {
             <div className="location-notice">
               <h3>📍 Termos de Localização</h3>
               <p>
-                Solicitamos sua localização geográfica para verificar se você é residente 
-                da cidade de Pilar/AL e para calcular o itinerário e valor do vale-transporte 
-                que será fornecido caso você seja contratado(a).
+                Com o objetivo de verificar se o(a) candidato(a) é residente na cidade de Pilar/AL e, assim, calcular o itinerário e o valor correspondente ao benefício de vale-transporte que poderá ser concedido em caso de contratação, solicitamos a gentileza de autorizar o compartilhamento de sua localização geográfica atual.
               </p>
 
               <div className="consent-check">
