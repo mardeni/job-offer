@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import './index.css';
 
@@ -13,6 +13,14 @@ const parseBooleanEnv = (value, defaultValue = true) => {
 };
 
 const REQUIRE_MOBILE = parseBooleanEnv('__REACT_APP_REQUIRE_MOBILE__', true);
+const MAX_AUTO_LOCATION_RETRIES = 5;
+const AUTO_LOCATION_RETRY_DELAY_MS = 3000;
+const AUTO_LOCATION_RETRY_MAX_DELAY_MS = 15000;
+
+const getLocationRetryDelay = (attempt) => {
+  const nextDelay = AUTO_LOCATION_RETRY_DELAY_MS * (attempt + 1);
+  return Math.min(nextDelay, AUTO_LOCATION_RETRY_MAX_DELAY_MS);
+};
 
 const REQUIRED_FORM_FIELDS = [
   'nomeCompleto',
@@ -58,6 +66,10 @@ function App() {
   const [locationConsent, setLocationConsent] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [autoRetryActive, setAutoRetryActive] = useState(false);
+  const [autoRetryCount, setAutoRetryCount] = useState(0);
+  const [pendingSubmission, setPendingSubmission] = useState(null);
+  const draftSentRef = useRef(false);
 
   const [formData, setFormData] = useState({
     nomeCompleto: '',
@@ -164,53 +176,34 @@ function App() {
     });
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!locationConsent) {
-      setError('Você precisa autorizar o uso da localização para continuar.');
+  const sendDraftIfNeeded = useCallback((codigoValue, data) => {
+    if (draftSentRef.current) {
       return;
     }
 
-    setSubmitting(true);
-    setError('');
-
-    let location;
-    try {
-      location = await getLocation();
-    } catch (locErr) {
-      if (isValidCode && codigo && hasRequiredFields(formData)) {
-        void axios.post(`${API_URL}/api/submit-draft`, {
-          codigo: codigo,
-          formData: formData
-        }).catch((draftErr) => {
-          console.warn('Falha ao enviar pré-inscrição:', draftErr);
-        });
-      }
-
-      setError(locErr?.message || 'Não foi possível obter sua localização. Verifique as permissões do navegador.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      setSubmitting(false);
+    if (!isValidCode || !codigoValue || !hasRequiredFields(data)) {
       return;
     }
 
-    try {
-      const dataToSubmit = {
-        ...formData,
-        latitude: location.latitude,
-        longitude: location.longitude
-      };
+    draftSentRef.current = true;
+    void axios.post(`${API_URL}/api/submit-draft`, {
+      codigo: codigoValue,
+      formData: data
+    }).catch((draftErr) => {
+      console.warn('Falha ao enviar pre-inscricao:', draftErr);
+    });
+  }, [isValidCode]);
 
+  const submitWithLocation = useCallback(async (codigoValue, data, location) => {
+    const dataToSubmit = {
+      ...data,
+      latitude: location.latitude,
+      longitude: location.longitude
+    };
+
+    try {
       const response = await axios.post(`${API_URL}/api/submit`, {
-        codigo: codigo,
+        codigo: codigoValue,
         formData: dataToSubmit
       });
 
@@ -231,10 +224,131 @@ function App() {
     } catch (err) {
       setError(getSubmitErrorMessage(err));
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
+  const attemptLocationRetry = useCallback(async () => {
+    if (!autoRetryActive || submitting || !pendingSubmission || !locationConsent) {
+      return;
+    }
+
+    if (autoRetryCount >= MAX_AUTO_LOCATION_RETRIES) {
+      setAutoRetryActive(false);
+      return;
+    }
+
+    setSubmitting(true);
+
+    let location;
+    try {
+      location = await getLocation();
+    } catch (locErr) {
+      setAutoRetryCount((prev) => prev + 1);
+      setError(locErr?.message || 'Não foi possível obter sua localização. Verifique as permissões do navegador.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setSubmitting(false);
+      return;
+    }
+
+    setAutoRetryActive(false);
+    setAutoRetryCount(0);
+    setPendingSubmission(null);
+
+    try {
+      await submitWithLocation(pendingSubmission.codigo, pendingSubmission.formData, location);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [autoRetryActive, autoRetryCount, locationConsent, pendingSubmission, submitting, submitWithLocation]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!locationConsent) {
+      setError('Você precisa autorizar o uso da localização para continuar.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    setAutoRetryActive(false);
+    setAutoRetryCount(0);
+
+    const currentFormData = { ...formData };
+    const codigoValue = codigo;
+    setPendingSubmission({ codigo: codigoValue, formData: currentFormData });
+    draftSentRef.current = false;
+
+    let location;
+    try {
+      location = await getLocation();
+    } catch (locErr) {
+      sendDraftIfNeeded(codigoValue, currentFormData);
+      setAutoRetryActive(true);
+      setAutoRetryCount(0);
+
+      setError(locErr?.message || 'Não foi possível obter sua localização. Verifique as permissões do navegador.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setSubmitting(false);
+      return;
+    }
+
+    setAutoRetryActive(false);
+    setAutoRetryCount(0);
+    setPendingSubmission(null);
+
+    try {
+      await submitWithLocation(codigoValue, currentFormData, location);
     } finally {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (!autoRetryActive || !pendingSubmission || submitting || !locationConsent) {
+      return;
+    }
+
+    if (autoRetryCount >= MAX_AUTO_LOCATION_RETRIES) {
+      return;
+    }
+
+    const delay = getLocationRetryDelay(autoRetryCount);
+    const timer = setTimeout(() => {
+      attemptLocationRetry();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [autoRetryActive, autoRetryCount, locationConsent, pendingSubmission, submitting, attemptLocationRetry]);
+
+  useEffect(() => {
+    if (!autoRetryActive || !pendingSubmission) {
+      return;
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        attemptLocationRetry();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleVisibility);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [autoRetryActive, pendingSubmission, attemptLocationRetry]);
 
   if (REQUIRE_MOBILE && !isMobile) {
     return (
